@@ -1,0 +1,99 @@
+name: CI
+
+# Pipeline graph (arrows are `needs:`):
+#
+#   lint ──┬──▶ check-artifacts ──┐
+#          │                      ├──▶ figures
+#          └──▶ simulate ─────────┘
+#
+# lint             ruff, errors only (syntax errors, undefined names); the code is not reformatted
+# check-artifacts  required files exist; results2_*.json / scores_*.npz agree; README tables == result files
+# simulate         `python sim.py 80` reproduces the paper's 448,294 LEACH-Sim records and the shipped cluster-head rows
+# figures          `python figs.py` redraws all 11 figures from the shipped results (uploaded as an artifact)
+#
+# "Run workflow" on the Actions tab starts it by hand (workflow_dispatch).
+
+on:
+  push:
+    branches: [main, "ci/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Ruff (errors only)
+        run: |
+          python -m pip install --upgrade pip ruff
+          ruff check --isolated --select E9,F63,F7,F82 .
+
+  check-artifacts:
+    name: check-artifacts
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install (versions pinned in requirements.txt)
+        run: grep -E '^(numpy|pandas)==' requirements.txt | xargs python -m pip install
+      - name: Result files and README tables agree
+        run: python tools/check_repro.py artifacts
+
+  simulate:
+    name: simulate
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install (versions pinned in requirements.txt)
+        run: grep -E '^(numpy|pandas)==' requirements.txt | xargs python -m pip install
+      - name: Regenerate LEACH-Sim (80 networks)
+        run: python sim.py 80
+      - name: Matches the paper's dataset
+        run: python tools/check_repro.py simulation
+
+  figures:
+    name: figures
+    needs: [check-artifacts, simulate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install (versions pinned in requirements.txt)
+        run: grep -E '^(numpy|pandas|scipy|scikit-learn|matplotlib)==' requirements.txt | xargs python -m pip install
+      - name: Redraw figures from the shipped results
+        run: MPLBACKEND=Agg python figs.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: figures
+          path: figs/
+          retention-days: 14
