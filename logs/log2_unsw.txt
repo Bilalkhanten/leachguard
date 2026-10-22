@@ -1,0 +1,2 @@
+unsw ['Analysis', 'Backdoor', 'DoS', 'Exploits', 'Fuzzers', 'Generic', 'Normal', 'Reconnaissance', 'Shellcode', 'Worms'] train (154301, 194) val (26302, 194) test (82332, 194)
+done unsw {'RF': 0.75, 'SVM': 0.7551, 'XGB': 0.7651, 'LSTM': 0.7662, 'kNN': 0.7221, 'Ensemble': 0.762}

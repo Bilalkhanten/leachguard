@@ -1,0 +1,2 @@
+nsl ['DoS', 'Normal', 'Probe', 'R2L', 'U2R'] train (111911, 122) val (18896, 122) test (22544, 122)
+done nsl {'RF': 0.7451, 'SVM': 0.7553, 'XGB': 0.7806, 'LSTM': 0.748, 'kNN': 0.7673, 'Ensemble': 0.7626}
